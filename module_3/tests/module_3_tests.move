@@ -4,6 +4,7 @@ module module_3::module_3_tests {
     use sui::test_scenario::{Self as ts, next_tx};
     use sui::coin;
     use sui::sui::SUI;
+    use sui::clock;
 
     // Error codes for assertions
     const EHeroNameMismatch: u64 = 1;
@@ -20,6 +21,7 @@ module module_3::module_3_tests {
     #[test]
     fun test_create_hero() {
         let mut scenario = ts::begin(SENDER);
+        let clock = clock::create_for_testing(scenario.ctx());
 
         // Create a hero
         {
@@ -27,7 +29,8 @@ module module_3::module_3_tests {
                 b"Ali".to_string(),
                 b"https://example.com/ali.png".to_string(),
                 9000,
-                scenario.ctx(),
+                &clock,
+                scenario.ctx()
             );
         };
 
@@ -46,12 +49,14 @@ module module_3::module_3_tests {
             ts::return_to_sender(&scenario, hero);
         };
 
+        clock::destroy_for_testing(clock);
         ts::end(scenario);
     }
 
     #[test]
     fun test_transfer_hero() {
         let mut scenario = ts::begin(SENDER);
+        let clock = clock::create_for_testing(scenario.ctx());
 
         // Create a hero first
         {
@@ -59,7 +64,8 @@ module module_3::module_3_tests {
                 b"Serkan".to_string(),
                 b"https://example.com/serkan.png".to_string(),
                 8500,
-                scenario.ctx(),
+                &clock,
+                scenario.ctx()
             );
         };
 
@@ -77,12 +83,14 @@ module module_3::module_3_tests {
         // Verify hero is now owned by recipient
         assert!(ts::has_most_recent_for_address<Hero>(RECIPIENT), EHeroNotTransferred);
 
+        clock::destroy_for_testing(clock);
         ts::end(scenario);
     }
 
     #[test]
     fun test_list_hero() {
         let mut scenario = ts::begin(SENDER);
+        let clock = clock::create_for_testing(scenario.ctx());
 
         // Create a hero first
         {
@@ -90,7 +98,8 @@ module module_3::module_3_tests {
                 b"Mantas".to_string(),
                 b"https://example.com/mantas.png".to_string(),
                 7500,
-                scenario.ctx(),
+                &clock,
+                scenario.ctx()
             );
         };
 
@@ -99,8 +108,8 @@ module module_3::module_3_tests {
         // List the hero for sale
         {
             let hero = ts::take_from_sender<Hero>(&scenario);
-            
-            hero::list_hero(hero, PRICE, scenario.ctx());
+
+            hero::list_hero(hero, PRICE, &clock, scenario.ctx());
         };
 
         next_tx(&mut scenario, SENDER);
@@ -108,12 +117,14 @@ module module_3::module_3_tests {
         // Verify ListHero object was created and shared
         assert!(ts::has_most_recent_shared<ListHero>(), EListHeroNotShared);
 
+        clock::destroy_for_testing(clock);
         ts::end(scenario);
     }
 
     #[test]
     fun test_buy_hero() {
         let mut scenario = ts::begin(SENDER);
+        let clock = clock::create_for_testing(scenario.ctx());
 
         // Create and list a hero
         {
@@ -121,7 +132,8 @@ module module_3::module_3_tests {
                 b"Teo".to_string(),
                 b"https://example.com/teo.png".to_string(),
                 6000,
-                scenario.ctx(),
+                &clock,
+                scenario.ctx()
             );
         };
 
@@ -130,7 +142,7 @@ module module_3::module_3_tests {
         {
             let hero = ts::take_from_sender<Hero>(&scenario);
 
-            hero::list_hero(hero, PRICE, scenario.ctx());
+            hero::list_hero(hero, PRICE, &clock, scenario.ctx());
         };
 
         next_tx(&mut scenario, RECIPIENT);
@@ -139,8 +151,8 @@ module module_3::module_3_tests {
         {
             let coin = coin::mint_for_testing<SUI>(PRICE, scenario.ctx());
             let list_hero = ts::take_shared<ListHero>(&scenario);
-            
-            hero::buy_hero(list_hero, coin, scenario.ctx());
+
+            hero::buy_hero(list_hero, coin, &clock, scenario.ctx());
         };
 
         next_tx(&mut scenario, RECIPIENT);
@@ -155,6 +167,7 @@ module module_3::module_3_tests {
             ts::return_to_address(RECIPIENT, hero);
         };
 
+        clock::destroy_for_testing(clock);
         ts::end(scenario);
     }
 

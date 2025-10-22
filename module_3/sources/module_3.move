@@ -1,10 +1,14 @@
-module module_3::hero; 
+module module_3::hero;
     // ========= IMPORTS =========
     use std::string::String;
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
     use sui::event;
-    
+    use sui::clock;
+
+    // ========= ERRORS =========
+    const EInvalidPrice: u64 = 0;
+
     // ========= STRUCTS =========
     public struct Hero has key, store {
         id: UID,
@@ -16,15 +20,23 @@ module module_3::hero;
     public struct ListHero has key, store {
         // TODO: Add the fields for the ListHero
         // 1. The id of the ListHero
+        id: UID,
         // 2. The nft object
+        nft: Hero,
         // 3. The price of the Hero
+        price: u64,
         // 4. The seller of the Hero
+        seller: address,
+        // 5. The timestamp of the ListHero
+        timestamp: u64,
     }
 
     public struct HeroMetadata has key, store {
         // TODO: Add the fields for the HeroMetadata
         // 1. The id of the HeroMetadata
+        id: UID,
         // 2. The timestamp of the HeroMetadata
+        timestamp: u64,
     }
 
     // ========= EVENTS =========
@@ -32,24 +44,33 @@ module module_3::hero;
     public struct HeroListed has copy, drop {
         // TODO: Add the fields for the HeroListed
         // 1. The id of the HeroListed
+        id: ID,
         // 2. The price of the Hero
+        price: u64,
         // 3. The seller of the Hero
+        seller: address,
         // 4. The timestamp of the HeroListed
+        timestamp: u64,
     }
 
     public struct HeroBought has copy, drop {
         // TODO: Add the fields for the HeroBought
         // 1. The id of the HeroBought
+        id: ID,
         // 2. The price of the Hero
+        price: u64,
         // 3. The buyer of the Hero
+        buyer: address,
         // 4. The seller of the Hero
+        seller: address,
         // 5. The timestamp of the HeroBought
+        timestamp: u64,
     }
 
     // ========= FUNCTIONS =========
 
-    #[allow(lint(self_transfer))]
-    public entry fun create_hero(name: String, image_url: String, power: u64,  ctx: &mut TxContext) {
+    // #[allow(lint(self_transfer))]
+    public entry fun create_hero(name: String, image_url: String, power: u64, clock: &clock::Clock, ctx: &mut TxContext) {
         let hero = Hero {
             id: object::new(ctx),
             name,
@@ -58,41 +79,67 @@ module module_3::hero;
         };
 
         let hero_metadata = HeroMetadata {
-            id: // TODO: Create the HeroMetadata object,
-            timestamp: // TODO: Get the epoch timestamp ,
+            // TODO: Create the HeroMetadata object,
+            id: object::new(ctx),
+            timestamp: clock.timestamp_ms(),
         };
 
         transfer::transfer(hero, ctx.sender());
 
         // TODO: Freeze the HeroMetadata object
-        
+        transfer::public_freeze_object(hero_metadata);
     }
 
 
 
-    public entry fun list_hero(nft: Hero, price: u64, ctx: &mut TxContext) {
+    public entry fun list_hero(nft: Hero, price: u64, clock: &clock::Clock, ctx: &mut TxContext) {
         // TODO: Define the ListHero object,
         let list_hero = ListHero {
             // TODO: Define the fields for the ListHero object
             // 1. Create the object id for the ListHero object
+            id: object::new(ctx),
             // 2. The nft object
+            nft,
             // 3. The price of the Hero
+            price,
             // 4. The seller of the Hero (the sender)
+            seller: ctx.sender(),
+            // 5. The timestamp
+            timestamp: clock.timestamp_ms(),
         };
 
         // TODO: Emit the HeroListed event
-
+        event::emit(HeroListed {
+            id: object::id(&list_hero),
+            price,
+            seller: list_hero.seller,
+            timestamp: list_hero.timestamp,
+        });
         // TODO: Share the ListHero object 
+        transfer::public_share_object(list_hero);
         
     }
 
-    public entry fun buy_hero(list_hero: ListHero, coin: Coin<SUI>, ctx: &mut TxContext) {
+    public entry fun buy_hero(list_hero: ListHero, coin: Coin<SUI>, clock: &clock::Clock, ctx: &mut TxContext) {
         // TODO: Deconstruct the ListHero object
+        let ListHero { id, nft, price, seller, timestamp } = list_hero;
         // TODO: Assert the price of the Hero is equal to the coin amount
+        assert!(coin::value(&coin) == price, EInvalidPrice);
         // TODO: Transfer the coin to the seller
+        transfer::public_transfer(coin, seller);
         // TODO: Transfer the Hero object to the sender
+        transfer::public_transfer(nft, ctx.sender());
         // TODO: Emit the HeroBought event
+        let bought_id = object::uid_to_inner(&id);
+        event::emit(HeroBought {
+            id: bought_id,
+            price,
+            buyer: ctx.sender(),
+            seller,
+            timestamp: clock.timestamp_ms(),
+        });
         // TODO: Destroy the ListHero object
+        object::delete(id);
     }
 
     public entry fun transfer_hero(hero: Hero, to: address) {
